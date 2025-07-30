@@ -49,26 +49,36 @@ export function AppIdeaCard() {
   };
 
   const handleNext = async () => {
-    if (!state.appIdea.appName.trim() || 
-        state.appIdea.platforms.length === 0 || 
-        !state.appIdea.designStyle || 
+    console.log('Continue button clicked!');
+    console.log('Current state:', state.appIdea);
+
+    if (!state.appIdea.appName.trim() ||
+        state.appIdea.platforms.length === 0 ||
+        !state.appIdea.designStyle ||
         !state.appIdea.ideaDescription.trim()) {
+      console.log('Validation failed: missing required fields');
       dispatch(builderActions.setError('Please fill in all required fields'));
       return;
     }
 
     if (state.appIdea.ideaDescription.trim().length < 50) {
+      console.log('Validation failed: description too short');
       dispatch(builderActions.setError('App description must be at least 50 characters'));
       return;
     }
 
+    console.log('Validation passed, proceeding to next stage');
     setIsSubmitting(true);
-    
+
     try {
+      // Clear any existing errors
+      dispatch(builderActions.setError(null));
+
       // Save current progress
       dispatch(builderActions.saveProject());
-      
+
       // Move to next stage
+      console.log('Setting current card to 2');
       dispatch(builderActions.setCurrentCard(2));
     } catch (error) {
       console.error('Error proceeding to next stage:', error);
@@ -213,12 +223,39 @@ export function AppIdeaCard() {
           </div>
         )}
 
+        {/* Validation Summary */}
+        <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <h4 className="text-sm font-medium mb-2">Required Fields Status:</h4>
+          <div className="space-y-1 text-xs">
+            <div className={`flex items-center gap-2 ${state.appIdea.appName.trim() ? 'text-green-600' : 'text-red-600'}`}>
+              <span>{state.appIdea.appName.trim() ? '✓' : '✗'}</span>
+              <span>App Name: {state.appIdea.appName.trim() || 'Not provided'}</span>
+            </div>
+            <div className={`flex items-center gap-2 ${state.appIdea.platforms.length > 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <span>{state.appIdea.platforms.length > 0 ? '✓' : '✗'}</span>
+              <span>Platforms: {state.appIdea.platforms.length > 0 ? state.appIdea.platforms.join(', ') : 'None selected'}</span>
+            </div>
+            <div className={`flex items-center gap-2 ${state.appIdea.designStyle ? 'text-green-600' : 'text-red-600'}`}>
+              <span>{state.appIdea.designStyle ? '✓' : '✗'}</span>
+              <span>Design Style: {state.appIdea.designStyle || 'Not selected'}</span>
+            </div>
+            <div className={`flex items-center gap-2 ${state.appIdea.ideaDescription.trim().length >= 50 ? 'text-green-600' : 'text-red-600'}`}>
+              <span>{state.appIdea.ideaDescription.trim().length >= 50 ? '✓' : '✗'}</span>
+              <span>Description: {state.appIdea.ideaDescription.trim().length}/50 characters</span>
+            </div>
+          </div>
+        </div>
+
         {/* Next Button */}
         <div className="flex justify-end pt-4">
-          <Button 
-            onClick={handleNext} 
+          <Button
+            onClick={(e) => {
+              console.log('Button clicked!', e);
+              handleNext();
+            }}
             disabled={isSubmitting}
             className="min-w-[120px]"
+            type="button"
           >
             {isSubmitting ? (
               <>
@@ -227,7 +264,7 @@ export function AppIdeaCard() {
               </>
             ) : (
               <>
-                Next Step
+                Continue
                 <ArrowRight className="ml-2 h-4 w-4" />
               </>
             )}
