@@ -190,7 +190,9 @@ const STORAGE_KEY = 'builder-blueprint-history';
 
 function saveToLocalStorage(history: ProjectHistory[]) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+    }
   } catch (error) {
     console.error('Failed to save to localStorage:', error);
   }
@@ -198,8 +200,11 @@ function saveToLocalStorage(history: ProjectHistory[]) {
 
 function loadFromLocalStorage(): ProjectHistory[] {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      return stored ? JSON.parse(stored) : [];
+    }
+    return [];
   } catch (error) {
     console.error('Failed to load from localStorage:', error);
     return [];
@@ -439,7 +444,7 @@ export function BuilderProvider({ children }: { children: ReactNode }) {
 
   // Persist current state to sessionStorage for recovery
   React.useEffect(() => {
-    if (state.currentCard > 1) {
+    if (state.currentCard > 1 && typeof window !== 'undefined') {
       try {
         sessionStorage.setItem('builder-current-state', JSON.stringify({
           currentCard: state.currentCard,
