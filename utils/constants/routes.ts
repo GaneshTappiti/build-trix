@@ -18,19 +18,14 @@ export const ROUTES: Route[] = [
     icon: LayoutDashboard,
   },
   {
-    title: 'MVP Generator',
-    url: '/mvp-generator',
-    icon: Code,
+    title: 'MVP Studio',
+    url: '/workspace/mvp-studio',
+    icon: Rocket,
   },
   {
     title: 'Your MVPs',
     url: '/your-mvps',
     icon: List,
-  },
-  {
-    title: 'Workspace',
-    url: '/workspace/mvp-studio',
-    icon: Rocket,
   },
   {
     title: 'Feedback',

@@ -470,7 +470,7 @@ export default function Home() {
               <h4 className="font-semibold text-foreground mb-4">Product</h4>
               <ul className="space-y-2 text-muted-foreground">
                 <li><Link href="/dashboard" className="hover:text-foreground transition-colors">Dashboard</Link></li>
-                <li><Link href="/mvp-generator" className="hover:text-foreground transition-colors">MVP Generator</Link></li>
+                <li><Link href="/workspace/mvp-studio" className="hover:text-foreground transition-colors">MVP Studio</Link></li>
                 <li><span className="opacity-50">Documentation</span></li>
                 <li><span className="opacity-50">API</span></li>
               </ul>

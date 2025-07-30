@@ -149,6 +149,7 @@ type BuilderAction =
   | { type: 'SET_GENERATING'; payload: boolean }
   | { type: 'SET_GENERATION_PROGRESS'; payload: number }
   | { type: 'SAVE_PROJECT'; payload?: string }
+  | { type: 'SAVE_TO_DATABASE'; payload?: { onSuccess?: (mvpId: string) => void; onError?: (error: string) => void } }
   | { type: 'LOAD_PROJECT'; payload: string }
   | { type: 'DELETE_PROJECT'; payload: string }
   | { type: 'LOAD_HISTORY' }
@@ -290,6 +291,40 @@ function loadHistory(state: BuilderState): BuilderState {
   return { ...state, projectHistory: history };
 }
 
+async function saveToDatabase(
+  state: BuilderState,
+  callbacks?: { onSuccess?: (mvpId: string) => void; onError?: (error: string) => void }
+): Promise<void> {
+  try {
+    const requestData = {
+      appIdea: state.appIdea,
+      validationQuestions: state.validationQuestions,
+      appBlueprint: state.appBlueprint,
+      screenPrompts: state.screenPrompts,
+      appFlow: state.appFlow,
+      exportPrompts: state.exportPrompts
+    };
+
+    const response = await fetch('/api/mvp-studio/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestData),
+    });
+
+    const result = await response.json();
+
+    if (result.success && result.mvp_id) {
+      callbacks?.onSuccess?.(result.mvp_id);
+    } else {
+      const errorMessage = result.error || 'Failed to save MVP to database';
+      callbacks?.onError?.(errorMessage);
+    }
+  } catch (error) {
+    console.error('Error saving to database:', error);
+    callbacks?.onError?.('Network error while saving MVP');
+  }
+}
+
 // Enhanced state management with validation
 function updateAppIdeaWithValidation(state: BuilderState, payload: Partial<AppIdea>): BuilderState {
   const newAppIdea = { ...state.appIdea, ...payload };
@@ -339,6 +374,11 @@ function builderReducer(state: BuilderState, action: BuilderAction): BuilderStat
       return { ...state, generationProgress: action.payload };
     case 'SAVE_PROJECT':
       return saveProject(state, action.payload);
+    case 'SAVE_TO_DATABASE':
+      // This is handled asynchronously, so we just return the current state
+      // The actual database save is triggered in the provider
+      saveToDatabase(state, action.payload);
+      return state;
     case 'LOAD_PROJECT':
       return loadProject(state, action.payload);
     case 'DELETE_PROJECT':
@@ -442,6 +482,10 @@ export const builderActions = {
   setGenerating: (generating: boolean) => ({ type: 'SET_GENERATING' as const, payload: generating }),
   setGenerationProgress: (progress: number) => ({ type: 'SET_GENERATION_PROGRESS' as const, payload: progress }),
   saveProject: (projectId?: string) => ({ type: 'SAVE_PROJECT' as const, payload: projectId }),
+  saveToDatabase: (callbacks?: { onSuccess?: (mvpId: string) => void; onError?: (error: string) => void }) => ({
+    type: 'SAVE_TO_DATABASE' as const,
+    payload: callbacks
+  }),
   loadProject: (projectId: string) => ({ type: 'LOAD_PROJECT' as const, payload: projectId }),
   deleteProject: (projectId: string) => ({ type: 'DELETE_PROJECT' as const, payload: projectId }),
   loadHistory: () => ({ type: 'LOAD_HISTORY' as const }),

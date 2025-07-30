@@ -1,6 +1,10 @@
 # BuildTrix - MVP Studio
 
+**The complete replacement for the traditional MVP Generator**
+
 A comprehensive platform that transforms app ideas into implementation-ready prompts through an AI-powered 6-stage process. Build your MVP faster with intelligent blueprint generation and optimized prompts for popular AI development tools.
+
+> **Note**: MVP Studio has replaced the previous MVP Generator, offering a much more comprehensive and powerful approach to MVP development.
 
 ## 🚀 Features
 
