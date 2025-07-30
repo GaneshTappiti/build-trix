@@ -19,7 +19,7 @@ export const ROUTES: Route[] = [
   },
   {
     title: 'MVP Studio',
-    url: '/workspace/mvp-studio',
+    url: '/mvp-studio',
     icon: Rocket,
   },
   {

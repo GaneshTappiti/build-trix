@@ -137,7 +137,7 @@ export default function FeedbackPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               <Button variant="outline" asChild className="w-full justify-start">
-                <Link href="/workspace/mvp-studio" className="flex items-center gap-2">
+                <Link href="/mvp-studio" className="flex items-center gap-2">
                   <Lightbulb className="h-4 w-4" />
                   Try MVP Studio
                 </Link>
