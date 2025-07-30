@@ -60,7 +60,7 @@ export default function MVPStudioPage() {
                 <Sparkles className="w-3 h-3 mr-1" />
                 AI-Powered
               </Badge>
-              <Link href="/workspace/mvp-studio/builder">
+              <Link href="/mvp-studio/builder">
                 <Button>
                   <Plus className="w-4 h-4 mr-2" />
                   New Project
@@ -96,7 +96,7 @@ export default function MVPStudioPage() {
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
                     Stage {state.currentCard} of 6
                   </p>
-                  <Link href="/workspace/mvp-studio/builder">
+                  <Link href="/mvp-studio/builder">
                     <Button>
                       Continue Building
                       <ArrowRight className="w-4 h-4 ml-2" />
@@ -200,7 +200,7 @@ export default function MVPStudioPage() {
               <p className="text-gray-600 dark:text-gray-400 mb-6">
                 Start with our 6-stage process to transform your app idea into implementation-ready prompts.
               </p>
-              <Link href="/workspace/mvp-studio/builder">
+              <Link href="/mvp-studio/builder">
                 <Button size="lg" className="bg-blue-600 hover:bg-blue-700">
                   <Rocket className="w-5 h-5 mr-2" />
                   Start Building

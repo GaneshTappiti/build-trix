@@ -34,10 +34,10 @@ A comprehensive platform that transforms app ideas into implementation-ready pro
    - `FlowDescriptionCard`: Navigation flow definition
    - `ExportComposerCard`: Final prompt generation
 
-3. **Workspace Infrastructure**
-   - `WorkspaceSidebar`: Navigation for all workspace modules
+3. **Main Application Integration**
    - `SixStageArchitecture`: Main orchestration component
-   - Responsive layout with collapsible sidebar
+   - Integrated with main application sidebar
+   - Streamlined navigation without extra sidebars
 
 ## 🐳 Docker Setup
 
@@ -116,8 +116,8 @@ docker run -p 3000:3000 -v $(pwd):/app -v /app/node_modules buildtrix-dev
 ## 📱 How to Use MVP Studio
 
 ### Step 1: Access MVP Studio
-- Navigate to "Workspace" in the main sidebar
-- Click on "MVP Studio"
+- Navigate to "MVP Studio" in the main sidebar
+- Click to access the studio directly
 
 ### Step 2: Start Building
 - Click "New Project" or "Start Building"

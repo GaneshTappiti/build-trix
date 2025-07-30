@@ -136,7 +136,7 @@ function EmptyState() {
           </p>
         </div>
         <Button asChild>
-          <Link href="/workspace/mvp-studio">Create Your First MVP</Link>
+          <Link href="/mvp-studio">Create Your First MVP</Link>
         </Button>
       </CardContent>
     </Card>

@@ -115,7 +115,7 @@ export default function DashboardPage() {
             <CardContent>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Button asChild className="h-auto flex-col gap-2 p-6">
-                  <Link href="/workspace/mvp-studio">
+                  <Link href="/mvp-studio">
                     <Plus className="h-6 w-6" />
                     <div className="text-center">
                       <div className="font-semibold">New MVP Idea</div>
@@ -411,7 +411,7 @@ function EmptyRecentMVPs() {
         </p>
       </div>
       <Button asChild size="sm">
-        <Link href="/workspace/mvp-studio">
+        <Link href="/mvp-studio">
           <Plus className="h-3 w-3 mr-1" />
           Create MVP
         </Link>
@@ -524,7 +524,7 @@ function getNextStepSuggestion(stats: ReturnType<typeof calculateStats>) {
           🎯 <strong>Create your first MVP idea</strong> - Every successful indie hacker started with idea #1!
         </p>
         <Button asChild size="sm" className="w-full">
-          <Link href="/workspace/mvp-studio">Generate Your First MVP</Link>
+          <Link href="/mvp-studio">Generate Your First MVP</Link>
         </Button>
       </>
     );
@@ -562,7 +562,7 @@ function getNextStepSuggestion(stats: ReturnType<typeof calculateStats>) {
         🌟 <strong>Keep innovating!</strong> You&apos;re on a roll. What&apos;s your next big idea?
       </p>
       <Button asChild size="sm" className="w-full">
-        <Link href="/workspace/mvp-studio">Create Another MVP</Link>
+        <Link href="/mvp-studio">Create Another MVP</Link>
       </Button>
     </>
   );

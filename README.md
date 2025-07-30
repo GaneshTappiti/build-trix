@@ -78,8 +78,8 @@ A comprehensive platform that transforms app ideas into implementation-ready pro
 ## 📱 How to Use MVP Studio
 
 ### Step 1: Access MVP Studio
-- Navigate to "Workspace" in the main sidebar
-- Click on "MVP Studio"
+- Navigate to "MVP Studio" in the main sidebar
+- Click to access the studio directly
 
 ### Step 2: Start Building
 Follow the 6-stage process:
@@ -114,14 +114,11 @@ Follow the 6-stage process:
 ```
 ├── app/
 │   ├── (authenticated)/
-│   │   ├── workspace/
-│   │   │   ├── mvp-studio/
-│   │   │   │   ├── page.tsx
-│   │   │   │   └── builder/
-│   │   │   │       └── page.tsx
-│   │   │   ├── ai-tools/
-│   │   │   ├── templates/
-│   │   │   └── layout.tsx
+│   │   ├── mvp-studio/
+│   │   │   ├── page.tsx
+│   │   │   ├── layout.tsx
+│   │   │   └── builder/
+│   │   │       └── page.tsx
 │   │   └── layout.tsx
 │   └── api/
 ├── components/
@@ -133,7 +130,6 @@ Follow the 6-stage process:
 │   │   ├── FlowDescriptionCard.tsx
 │   │   ├── ExportComposerCard.tsx
 │   │   └── SixStageArchitecture.tsx
-│   ├── WorkspaceSidebar.tsx
 │   └── ui/
 ├── lib/
 │   └── builderContext.tsx
