@@ -176,27 +176,36 @@ DECLARE
     platform_count INTEGER;
     feature_count INTEGER;
     complexity INTEGER;
+    mvp_record RECORD;
 BEGIN
-    SELECT 
-        array_length(platforms, 1),
-        CASE 
-            WHEN app_blueprint IS NOT NULL THEN 
+    -- Get MVP record with null checks
+    SELECT
+        array_length(platforms, 1) as platform_count,
+        CASE
+            WHEN app_blueprint IS NOT NULL THEN
                 COALESCE(jsonb_array_length(app_blueprint->'features'), 0)
             ELSE 0
-        END
-    INTO platform_count, feature_count
+        END as feature_count,
+        is_mvp_studio_project
+    INTO mvp_record
     FROM public.mvps
     WHERE id = mvp_id_param;
-    
-    -- Calculate complexity score (1-10)
-    complexity := LEAST(10, GREATEST(1, 
-        (platform_count * 2) + 
-        (feature_count / 3) + 
-        CASE WHEN is_mvp_studio_project THEN 2 ELSE 0 END
+
+    -- Check if MVP exists
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'MVP with ID % not found', mvp_id_param;
+    END IF;
+
+    -- Calculate complexity score (1-10) with null safety
+    complexity := LEAST(10, GREATEST(1,
+        (COALESCE(mvp_record.platform_count, 1) * 2) +
+        (COALESCE(mvp_record.feature_count, 0) / 3) +
+        CASE WHEN mvp_record.is_mvp_studio_project THEN 2 ELSE 0 END
     ));
-    
+
     UPDATE public.mvps
-    SET complexity_score = complexity
+    SET complexity_score = complexity,
+        updated_at = NOW()
     WHERE id = mvp_id_param;
 END;
 $$ LANGUAGE plpgsql;
@@ -257,17 +266,29 @@ DECLARE
     avg_similarity DECIMAL;
     confidence DECIMAL;
 BEGIN
-    -- Calculate average similarity
-    SELECT AVG(score) INTO avg_similarity
-    FROM unnest(similarity_scores) AS score;
-    
+    -- Validate inputs
+    IF similarity_scores IS NULL OR array_length(similarity_scores, 1) = 0 THEN
+        avg_similarity := 0;
+    ELSE
+        -- Calculate average similarity with null safety
+        SELECT AVG(score) INTO avg_similarity
+        FROM unnest(similarity_scores) AS score
+        WHERE score IS NOT NULL;
+    END IF;
+
+    -- Ensure knowledge_count is not negative
+    knowledge_count := GREATEST(0, COALESCE(knowledge_count, 0));
+
+    -- Ensure tool_success_rate is within bounds
+    tool_success_rate := LEAST(1.0, GREATEST(0.0, COALESCE(tool_success_rate, 0.5)));
+
     -- Calculate confidence based on multiple factors
     confidence := (
         (COALESCE(avg_similarity, 0) * 0.4) +
         (LEAST(knowledge_count / 5.0, 1.0) * 0.3) +
         (tool_success_rate * 0.3)
     );
-    
+
     RETURN LEAST(1.0, GREATEST(0.0, confidence));
 END;
 $$ LANGUAGE plpgsql;

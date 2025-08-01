@@ -4,9 +4,24 @@
 -- This file contains the core application tables
 -- Run this first before other schema files
 
--- Enable necessary extensions
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+-- Enable necessary extensions with proper error handling
+DO $$
+BEGIN
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+    RAISE NOTICE 'Extension uuid-ossp enabled successfully';
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE WARNING 'Failed to enable uuid-ossp extension: %', SQLERRM;
+END $$;
+
+DO $$
+BEGIN
+    CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+    RAISE NOTICE 'Extension pgcrypto enabled successfully';
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE WARNING 'Failed to enable pgcrypto extension: %', SQLERRM;
+END $$;
 
 -- =====================================================
 -- 1. USER PROFILES TABLE
@@ -18,9 +33,9 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
     full_name TEXT,
     avatar_url TEXT,
     subscription_tier TEXT DEFAULT 'free' CHECK (subscription_tier IN ('free', 'pro', 'enterprise')),
-    mvp_limit INTEGER DEFAULT 3,
-    export_limit INTEGER DEFAULT 10,
-    api_calls_limit INTEGER DEFAULT 100,
+    mvp_limit INTEGER DEFAULT 3 CHECK (mvp_limit >= 0),
+    export_limit INTEGER DEFAULT 10 CHECK (export_limit >= 0),
+    api_calls_limit INTEGER DEFAULT 100 CHECK (api_calls_limit >= 0),
     
     -- Preferences
     default_ai_tool TEXT,
@@ -28,9 +43,9 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
     preferred_style TEXT DEFAULT 'Minimal & Clean',
     
     -- Usage tracking
-    mvps_created INTEGER DEFAULT 0,
-    exports_generated INTEGER DEFAULT 0,
-    api_calls_made INTEGER DEFAULT 0,
+    mvps_created INTEGER DEFAULT 0 CHECK (mvps_created >= 0),
+    exports_generated INTEGER DEFAULT 0 CHECK (exports_generated >= 0),
+    api_calls_made INTEGER DEFAULT 0 CHECK (api_calls_made >= 0),
     
     -- Timestamps
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -47,15 +62,15 @@ CREATE TABLE IF NOT EXISTS public.mvps (
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
     
     -- Basic MVP Information
-    app_name TEXT NOT NULL,
-    platforms TEXT[] NOT NULL CHECK (array_length(platforms, 1) > 0),
+    app_name TEXT NOT NULL CHECK (LENGTH(TRIM(app_name)) > 0),
+    platforms TEXT[] NOT NULL CHECK (platforms IS NOT NULL AND array_length(platforms, 1) > 0),
     style TEXT NOT NULL CHECK (style IN ('Minimal & Clean', 'Playful & Animated', 'Business & Professional')),
     style_description TEXT,
-    app_description TEXT NOT NULL,
+    app_description TEXT NOT NULL CHECK (LENGTH(TRIM(app_description)) > 0),
     target_users TEXT,
     
     -- MVP Studio Enhanced Data
-    generated_prompt TEXT NOT NULL,
+    generated_prompt TEXT NOT NULL CHECK (LENGTH(TRIM(generated_prompt)) > 0),
     app_blueprint JSONB, -- Stores the complete app blueprint from Stage 3
     screen_prompts JSONB, -- Stores individual screen prompts from Stage 4
     app_flow JSONB, -- Stores navigation flow from Stage 5
@@ -69,14 +84,18 @@ CREATE TABLE IF NOT EXISTS public.mvps (
     
     -- Metadata
     tags TEXT[] DEFAULT ARRAY[]::TEXT[],
-    estimated_hours INTEGER,
-    actual_hours INTEGER,
+    estimated_hours INTEGER CHECK (estimated_hours IS NULL OR estimated_hours > 0),
+    actual_hours INTEGER CHECK (actual_hours IS NULL OR actual_hours > 0),
     complexity_score INTEGER CHECK (complexity_score BETWEEN 1 AND 10),
     
     -- Timestamps
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Create unique index for case-insensitive app name per user
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mvps_user_app_name_unique
+    ON public.mvps(user_id, LOWER(app_name));
 
 -- =====================================================
 -- 3. QUESTIONNAIRE RESPONSES TABLE
@@ -104,13 +123,16 @@ CREATE TABLE IF NOT EXISTS public.questionnaire (
     technical_experience TEXT CHECK (technical_experience IN ('beginner', 'intermediate', 'advanced')),
     
     -- Additional context
-    timeline_weeks INTEGER,
+    timeline_weeks INTEGER CHECK (timeline_weeks IS NULL OR timeline_weeks > 0),
     budget_range TEXT,
-    team_size INTEGER DEFAULT 1,
+    team_size INTEGER DEFAULT 1 CHECK (team_size > 0),
     
     -- Timestamps
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+
+    -- Ensure one questionnaire per MVP
+    UNIQUE(mvp_id)
 );
 
 -- =====================================================
@@ -130,7 +152,7 @@ CREATE TABLE IF NOT EXISTS public.mvp_studio_sessions (
     
     -- Progress tracking
     stages_completed INTEGER[] DEFAULT ARRAY[]::INTEGER[],
-    time_spent_minutes INTEGER DEFAULT 0,
+    time_spent_minutes INTEGER DEFAULT 0 CHECK (time_spent_minutes >= 0),
     
     -- Auto-save functionality
     last_saved_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -153,11 +175,11 @@ CREATE TABLE IF NOT EXISTS public.export_history (
     export_format TEXT DEFAULT 'text' CHECK (export_format IN ('text', 'markdown', 'json')),
     
     -- Content
-    export_content TEXT NOT NULL,
-    export_size_bytes INTEGER,
+    export_content TEXT NOT NULL CHECK (LENGTH(TRIM(export_content)) > 0),
+    export_size_bytes INTEGER CHECK (export_size_bytes IS NULL OR export_size_bytes >= 0),
     
     -- Metadata
-    generation_time_ms INTEGER,
+    generation_time_ms INTEGER CHECK (generation_time_ms IS NULL OR generation_time_ms >= 0),
     was_successful BOOLEAN DEFAULT TRUE,
     error_message TEXT,
     
@@ -176,8 +198,8 @@ CREATE TABLE IF NOT EXISTS public.feedback (
     
     -- Feedback Content
     type TEXT NOT NULL CHECK (type IN ('bug', 'feature', 'improvement', 'general')),
-    title TEXT NOT NULL,
-    description TEXT NOT NULL,
+    title TEXT NOT NULL CHECK (LENGTH(TRIM(title)) > 0),
+    description TEXT NOT NULL CHECK (LENGTH(TRIM(description)) > 0),
     priority TEXT DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'critical')),
     
     -- Context
@@ -220,8 +242,8 @@ CREATE TABLE IF NOT EXISTS public.analytics_events (
     ip_address INET,
     
     -- Performance metrics
-    page_load_time_ms INTEGER,
-    api_response_time_ms INTEGER,
+    page_load_time_ms INTEGER CHECK (page_load_time_ms IS NULL OR page_load_time_ms >= 0),
+    api_response_time_ms INTEGER CHECK (api_response_time_ms IS NULL OR api_response_time_ms >= 0),
     
     -- Timestamps
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -238,12 +260,12 @@ CREATE TABLE IF NOT EXISTS public.rate_limits (
     
     -- Rate Limit Data
     resource_type TEXT NOT NULL, -- 'mvp_generation', 'export_generation', 'api_calls', etc.
-    count INTEGER DEFAULT 0,
+    count INTEGER DEFAULT 0 CHECK (count >= 0),
     reset_date DATE NOT NULL,
     
     -- Limits based on subscription
-    daily_limit INTEGER NOT NULL,
-    monthly_limit INTEGER,
+    daily_limit INTEGER NOT NULL CHECK (daily_limit > 0),
+    monthly_limit INTEGER CHECK (monthly_limit IS NULL OR monthly_limit > 0),
     
     -- Metadata
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

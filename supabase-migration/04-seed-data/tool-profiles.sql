@@ -330,19 +330,31 @@ INSERT INTO public.rag_tool_profiles (
 -- =====================================================
 
 -- Update tool profile statistics based on existing generation data
-UPDATE public.rag_tool_profiles
-SET 
-    total_generations = COALESCE(subquery.total_count, 0),
-    average_success_rate = COALESCE(subquery.success_rate, 0.5)
-FROM (
-    SELECT 
-        target_tool,
-        COUNT(*) as total_count,
-        AVG(CASE WHEN was_successful THEN 1.0 ELSE 0.0 END) as success_rate
-    FROM public.rag_prompt_generations
-    GROUP BY target_tool
-) AS subquery
-WHERE tool_id = subquery.target_tool;
+DO $$
+BEGIN
+    -- Only update if rag_prompt_generations table has data
+    IF EXISTS (SELECT 1 FROM public.rag_prompt_generations LIMIT 1) THEN
+        UPDATE public.rag_tool_profiles
+        SET
+            total_generations = COALESCE(subquery.total_count, 0),
+            average_success_rate = COALESCE(subquery.success_rate, average_success_rate),
+            updated_at = NOW()
+        FROM (
+            SELECT
+                target_tool,
+                COUNT(*) as total_count,
+                AVG(CASE WHEN was_successful THEN 1.0 ELSE 0.0 END) as success_rate
+            FROM public.rag_prompt_generations
+            WHERE target_tool IS NOT NULL
+            GROUP BY target_tool
+        ) AS subquery
+        WHERE tool_id = subquery.target_tool;
+
+        RAISE NOTICE 'Updated tool profile statistics based on existing generation data';
+    ELSE
+        RAISE NOTICE 'No generation data found, keeping default statistics';
+    END IF;
+END $$;
 
 -- =====================================================
 -- 4. VERIFICATION

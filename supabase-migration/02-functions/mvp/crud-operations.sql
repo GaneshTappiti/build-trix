@@ -73,13 +73,13 @@ BEGIN
         RAISE EXCEPTION 'Completion stage must be between 1 and 6';
     END IF;
     
-    -- Check for duplicate app name for user
+    -- Check for duplicate app name for user (case-insensitive)
     IF EXISTS (
-        SELECT 1 FROM public.mvps 
-        WHERE user_id = user_id_param 
-        AND LOWER(app_name) = LOWER(app_name_param)
+        SELECT 1 FROM public.mvps
+        WHERE user_id = user_id_param
+        AND LOWER(TRIM(app_name)) = LOWER(TRIM(app_name_param))
     ) THEN
-        RAISE EXCEPTION 'An MVP with this name already exists';
+        RAISE EXCEPTION 'An MVP with this name already exists for this user';
     END IF;
     
     -- Create the MVP
@@ -319,15 +319,15 @@ BEGIN
         RAISE EXCEPTION 'Invalid status: %', status_param;
     END IF;
     
-    -- Check for duplicate app name if name is being changed
-    IF app_name_param IS NOT NULL AND LOWER(app_name_param) != LOWER(current_mvp.app_name) THEN
+    -- Check for duplicate app name if name is being changed (case-insensitive)
+    IF app_name_param IS NOT NULL AND LOWER(TRIM(app_name_param)) != LOWER(TRIM(current_mvp.app_name)) THEN
         IF EXISTS (
-            SELECT 1 FROM public.mvps 
-            WHERE user_id = user_id_param 
-            AND LOWER(app_name) = LOWER(app_name_param)
+            SELECT 1 FROM public.mvps
+            WHERE user_id = user_id_param
+            AND LOWER(TRIM(app_name)) = LOWER(TRIM(app_name_param))
             AND id != mvp_id_param
         ) THEN
-            RAISE EXCEPTION 'An MVP with this name already exists';
+            RAISE EXCEPTION 'An MVP with this name already exists for this user';
         END IF;
     END IF;
     
@@ -502,10 +502,20 @@ RETURNS TABLE (
     deleted_id UUID,
     app_name TEXT
 ) AS $$
+DECLARE
+    deleted_count INTEGER;
 BEGIN
+    -- Validate input
+    IF mvp_ids_param IS NULL OR array_length(mvp_ids_param, 1) = 0 THEN
+        RAISE EXCEPTION 'No MVP IDs provided for deletion';
+    END IF;
+
     RETURN QUERY
     DELETE FROM public.mvps
     WHERE user_id = user_id_param AND id = ANY(mvp_ids_param)
     RETURNING id as deleted_id, app_name;
+
+    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+    RAISE NOTICE 'Deleted % MVPs for user %', deleted_count, user_id_param;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

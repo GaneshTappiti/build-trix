@@ -8,10 +8,11 @@
 -- 1. SEARCH KNOWLEDGE BASE
 -- =====================================================
 
--- Vector similarity search with filters
+-- Vector similarity search with filters (uncomment if pgvector extension is available)
 -- Usage: Replace parameters with actual values
 -- Used in: GET /api/rag/knowledge-base (with query)
-SELECT 
+/*
+SELECT
     id,
     title,
     content,
@@ -35,6 +36,39 @@ WHERE is_active = true
     AND (embedding <=> $1::vector) < $6 -- similarity_threshold
 ORDER BY embedding <=> $1::vector
 LIMIT $7; -- max_results
+*/
+
+-- Text-based similarity search (fallback)
+-- Usage: Replace parameters with actual values
+-- Used in: GET /api/rag/knowledge-base (with query)
+SELECT
+    id,
+    title,
+    content,
+    document_type,
+    target_tools,
+    categories,
+    complexity_level,
+    source_url,
+    tags,
+    quality_score,
+    usage_count,
+    created_at,
+    ts_rank(
+        to_tsvector('english', title || ' ' || content || ' ' || array_to_string(tags, ' ')),
+        plainto_tsquery('english', $1)
+    ) as similarity_score
+FROM public.rag_knowledge_base
+WHERE is_active = true
+    AND review_status = 'approved'
+    AND to_tsvector('english', title || ' ' || content || ' ' || array_to_string(tags, ' '))
+        @@ plainto_tsquery('english', $1)
+    AND ($2::TEXT[] IS NULL OR target_tools && $2) -- target_tools filter
+    AND ($3::TEXT[] IS NULL OR categories && $3) -- categories filter
+    AND ($4::TEXT IS NULL OR complexity_level = $4) -- complexity filter
+    AND ($5::TEXT IS NULL OR document_type = $5) -- document_type filter
+ORDER BY similarity_score DESC
+LIMIT $6; -- max_results
 
 -- Regular database search without vector similarity
 -- Usage: Replace parameters with actual values
@@ -110,7 +144,7 @@ INSERT INTO public.rag_knowledge_base (
     source_url,
     tags,
     quality_score,
-    embedding,
+    embedding_text,
     created_by,
     review_status
 ) VALUES (
@@ -123,7 +157,7 @@ INSERT INTO public.rag_knowledge_base (
     $7, -- source_url
     $8, -- tags
     COALESCE($9, 0.5), -- quality_score
-    $10, -- embedding (vector)
+    $10, -- embedding_text (TEXT)
     $11, -- created_by (user_id)
     COALESCE($12, 'pending') -- review_status
 )
@@ -147,7 +181,7 @@ SET
     source_url = COALESCE($8, source_url),
     tags = COALESCE($9, tags),
     quality_score = COALESCE($10, quality_score),
-    embedding = COALESCE($11, embedding),
+    embedding_text = COALESCE($11, embedding_text),
     review_status = COALESCE($12, review_status),
     updated_at = NOW()
 WHERE id = $1 

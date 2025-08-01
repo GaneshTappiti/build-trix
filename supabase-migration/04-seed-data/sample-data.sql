@@ -389,48 +389,59 @@ export async function POST(request: NextRequest) {
 -- This is just for testing purposes with sample user IDs
 
 -- Sample RAG user preferences (using placeholder UUIDs)
-INSERT INTO public.rag_user_preferences (
-    user_id,
-    default_ai_tool,
-    default_complexity,
-    default_experience,
-    enable_enhancement_suggestions,
-    enable_confidence_scoring,
-    enable_tool_recommendations,
-    preferred_prompt_style,
-    preferred_detail_level,
-    learning_mode,
-    total_prompts_generated,
-    favorite_tools
-) VALUES 
-(
-    '00000000-0000-0000-0000-000000000001'::UUID, -- Sample user ID
-    'lovable',
-    'medium',
-    'intermediate',
-    true,
-    true,
-    true,
-    'structured',
-    'detailed',
-    true,
-    15,
-    '["lovable", "cursor"]'::jsonb
-),
-(
-    '00000000-0000-0000-0000-000000000002'::UUID, -- Sample user ID
-    'v0',
-    'simple',
-    'beginner',
-    true,
-    false,
-    true,
-    'conversational',
-    'medium',
-    true,
-    8,
-    '["v0", "chatgpt"]'::jsonb
-);
+-- Note: These are for development/testing only
+DO $$
+BEGIN
+    -- Only insert if these sample users don't already exist
+    IF NOT EXISTS (SELECT 1 FROM public.rag_user_preferences WHERE user_id = '00000000-0000-0000-0000-000000000001'::UUID) THEN
+        INSERT INTO public.rag_user_preferences (
+            user_id,
+            default_ai_tool,
+            default_complexity,
+            default_experience,
+            enable_enhancement_suggestions,
+            enable_confidence_scoring,
+            enable_tool_recommendations,
+            preferred_prompt_style,
+            preferred_detail_level,
+            learning_mode,
+            total_prompts_generated,
+            favorite_tools
+        ) VALUES
+        (
+            '00000000-0000-0000-0000-000000000001'::UUID, -- Sample user ID
+            'lovable',
+            'medium',
+            'intermediate',
+            true,
+            true,
+            true,
+            'structured',
+            'detailed',
+            true,
+            15,
+            '["lovable", "cursor"]'::jsonb
+        ),
+        (
+            '00000000-0000-0000-0000-000000000002'::UUID, -- Sample user ID
+            'v0',
+            'simple',
+            'beginner',
+            true,
+            false,
+            true,
+            'conversational',
+            'medium',
+            true,
+            8,
+            '["v0", "chatgpt"]'::jsonb
+        );
+
+        RAISE NOTICE 'Inserted sample user preferences';
+    ELSE
+        RAISE NOTICE 'Sample user preferences already exist, skipping insert';
+    END IF;
+END $$;
 
 -- =====================================================
 -- 3. SAMPLE ANALYTICS DATA

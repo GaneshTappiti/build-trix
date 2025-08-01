@@ -281,19 +281,24 @@ RETURNS TABLE (
     exports_reset INTEGER,
     api_calls_reset INTEGER
 ) AS $$
+DECLARE
+    reset_count INTEGER;
 BEGIN
     RETURN QUERY
     UPDATE public.user_profiles
-    SET 
+    SET
         exports_generated = 0,
         api_calls_made = 0,
         updated_at = NOW()
     WHERE subscription_tier IN ('free', 'pro')
-    RETURNING 
+    RETURNING
         id as user_id,
         subscription_tier,
-        exports_generated as exports_reset,
-        api_calls_made as api_calls_reset;
+        0 as exports_reset, -- Return 0 since we reset to 0
+        0 as api_calls_reset; -- Return 0 since we reset to 0
+
+    GET DIAGNOSTICS reset_count = ROW_COUNT;
+    RAISE NOTICE 'Reset monthly counters for % users', reset_count;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -444,9 +449,14 @@ RETURNS TABLE (
     mvp_count BIGINT
 ) AS $$
 BEGIN
+    -- Validate input
+    IF days_inactive <= 0 THEN
+        RAISE EXCEPTION 'days_inactive must be positive, got: %', days_inactive;
+    END IF;
+
     RETURN QUERY
     WITH inactive_users AS (
-        SELECT 
+        SELECT
             up.id,
             up.full_name,
             GREATEST(up.updated_at, COALESCE(MAX(m.updated_at), up.updated_at)) as last_activity,
@@ -460,7 +470,7 @@ BEGIN
     )
     DELETE FROM public.user_profiles
     WHERE id IN (SELECT id FROM inactive_users)
-    RETURNING 
+    RETURNING
         id as cleaned_user_id,
         full_name,
         updated_at as last_activity,

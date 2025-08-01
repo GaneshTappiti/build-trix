@@ -142,8 +142,8 @@ CREATE POLICY "Users can view own rate limits" ON public.rate_limits
     FOR SELECT USING (auth.uid() = user_id);
 
 -- System can manage rate limits (handled by service role)
-CREATE POLICY "System can manage rate limits" ON public.rate_limits
-    FOR ALL USING (true);
+-- Note: This policy allows service role to bypass RLS for rate limit management
+-- The service role key should be used for system operations only
 
 -- =====================================================
 -- 10. RAG KNOWLEDGE BASE POLICIES
@@ -259,9 +259,9 @@ CREATE OR REPLACE FUNCTION public.is_admin()
 RETURNS BOOLEAN AS $$
 BEGIN
     RETURN EXISTS (
-        SELECT 1 FROM public.user_profiles 
-        WHERE id = auth.uid() 
-        AND subscription_tier = 'admin'
+        SELECT 1 FROM public.user_profiles
+        WHERE id = auth.uid()
+        AND subscription_tier = 'enterprise' -- Using enterprise as admin tier
     );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

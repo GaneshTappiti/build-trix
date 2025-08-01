@@ -243,10 +243,30 @@ CREATE INDEX IF NOT EXISTS idx_rag_knowledge_usage
 CREATE INDEX IF NOT EXISTS idx_rag_knowledge_tags 
     ON public.rag_knowledge_base USING GIN(tags);
 
--- Vector similarity search (requires pgvector extension)
-CREATE INDEX IF NOT EXISTS idx_rag_knowledge_embedding 
-    ON public.rag_knowledge_base USING ivfflat (embedding vector_cosine_ops) 
-    WITH (lists = 100);
+-- Vector similarity search (conditional based on extension availability)
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector') THEN
+        -- Check if index doesn't already exist
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_indexes
+            WHERE indexname = 'idx_rag_knowledge_embedding'
+            AND schemaname = 'public'
+        ) THEN
+            EXECUTE 'CREATE INDEX idx_rag_knowledge_embedding ON public.rag_knowledge_base USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100)';
+            RAISE NOTICE 'Vector similarity index created successfully';
+        ELSE
+            RAISE NOTICE 'Vector similarity index already exists';
+        END IF;
+    ELSE
+        RAISE NOTICE 'Vector extension not available, skipping vector index creation';
+    END IF;
+END $$;
+
+-- Text-based embedding index (fallback)
+CREATE INDEX IF NOT EXISTS idx_rag_knowledge_embedding_text
+    ON public.rag_knowledge_base(embedding_text)
+    WHERE embedding_text IS NOT NULL;
 
 -- Full-text search
 CREATE INDEX IF NOT EXISTS idx_rag_knowledge_content_fts 
