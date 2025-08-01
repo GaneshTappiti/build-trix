@@ -1,4 +1,4 @@
-import { Code, LayoutDashboard, LucideIcon, List, MessageCircle, Rocket } from 'lucide-react';
+import { Calendar, Code, LayoutDashboard, LucideIcon, List, MessageCircle, Rocket, Target, Brain } from 'lucide-react';
 
 export type Route = {
   title: string;
@@ -18,9 +18,24 @@ export const ROUTES: Route[] = [
     icon: LayoutDashboard,
   },
   {
+    title: 'Workspace',
+    url: '/workspace',
+    icon: Brain,
+  },
+  {
     title: 'MVP Studio',
     url: '/mvp-studio',
     icon: Rocket,
+  },
+  {
+    title: 'Business Model Canvas',
+    url: '/workspace/business-model-canvas',
+    icon: Target,
+  },
+  {
+    title: 'Task Planner',
+    url: '/task-planner',
+    icon: Calendar,
   },
   {
     title: 'Your MVPs',
