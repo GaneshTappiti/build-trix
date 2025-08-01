@@ -67,12 +67,15 @@ A comprehensive platform that transforms app ideas into implementation-ready pro
    GOOGLE_AI_API_KEY=your_google_ai_key
    ```
 
-4. **Run the development server:**
+4. **Set up the database:**
+   Follow the [Database Migration Guide](./supabase-migration/README.md) to set up your Supabase database with all required tables, functions, and seed data.
+
+5. **Run the development server:**
    ```bash
    npm run dev
    ```
 
-5. **Open your browser:**
+6. **Open your browser:**
    Navigate to `http://localhost:3000`
 
 ## 📱 How to Use MVP Studio
@@ -112,31 +115,50 @@ Follow the 6-stage process:
 ## 🏗️ Project Structure
 
 ```
-├── app/
-│   ├── (authenticated)/
-│   │   ├── mvp-studio/
-│   │   │   ├── page.tsx
-│   │   │   ├── layout.tsx
-│   │   │   └── builder/
-│   │   │       └── page.tsx
-│   │   └── layout.tsx
-│   └── api/
-├── components/
-│   ├── builder-cards/
-│   │   ├── AppIdeaCard.tsx
-│   │   ├── ValidationCard.tsx
-│   │   ├── BlueprintCard.tsx
-│   │   ├── PromptGeneratorCard.tsx
-│   │   ├── FlowDescriptionCard.tsx
-│   │   ├── ExportComposerCard.tsx
-│   │   └── SixStageArchitecture.tsx
-│   └── ui/
-├── lib/
-│   └── builderContext.tsx
-└── utils/
-    └── constants/
-        └── routes.ts
+├── app/                    # Next.js app directory
+│   ├── (auth)/            # Authentication pages
+│   ├── (authenticated)/   # Protected pages
+│   │   └── mvp-studio/    # MVP Studio interface
+│   ├── (public)/          # Public pages
+│   ├── api/               # API routes
+│   └── auth/              # Auth configuration
+├── components/            # React components
+│   ├── ai-tools/         # AI tool integrations
+│   ├── builder-cards/    # MVP builder components
+│   ├── prompts/          # Prompt management
+│   ├── rag/              # RAG system components
+│   ├── sidebar/          # Navigation components
+│   ├── storage/          # Storage components
+│   └── ui/               # UI components
+├── hooks/                 # Custom React hooks
+├── lib/                   # Utility libraries
+├── scripts/               # Build and deployment scripts
+├── supabase-migration/    # Database migration files
+│   ├── 01-schema/        # Database schema
+│   ├── 02-functions/     # Database functions
+│   ├── 03-api-queries/   # API-specific queries
+│   └── 04-seed-data/     # Initial data
+├── types/                 # TypeScript type definitions
+└── utils/                 # Utility functions
 ```
+
+## 📊 Database Migration
+
+The project includes a comprehensive database migration system in the `supabase-migration/` folder:
+
+### Migration Structure
+- **01-schema/**: Core tables, indexes, RLS policies, and functions
+- **02-functions/**: Database functions organized by feature
+- **03-api-queries/**: Optimized queries for each API endpoint
+- **04-seed-data/**: Initial data including RAG tool profiles
+
+### Key Features
+- ✅ **Complete Schema**: All tables for MVP management, RAG system, analytics
+- ✅ **Performance Optimized**: Strategic indexes for common query patterns
+- ✅ **Security First**: Row Level Security on all tables
+- ✅ **Production Ready**: Proper constraints, validation, and error handling
+
+See the [Migration README](./supabase-migration/README.md) and [Deployment Guide](./supabase-migration/DEPLOYMENT_GUIDE.md) for detailed instructions.
 
 ## 🎨 Key Components
 
