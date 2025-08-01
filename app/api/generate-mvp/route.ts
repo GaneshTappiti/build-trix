@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server';
 import { GenerateMVPRequest, GenerateMVPResponse, MVPIdeaFormData } from '@/types/questionnaire';
 import { CreateMVPData } from '@/types/mvp';
 import { consumeMVPRateLimit, checkMVPRateLimit, clearMVPRateLimit } from '@/lib/ratelimit';
+import { enhancePromptWithRAG } from '@/lib/rag-enhancer';
 
 export async function POST(request: NextRequest) {
   try {
@@ -181,7 +182,10 @@ async function generateMVPPrompt(
   const model = 'gemini-2.5-flash';
 
   // Build comprehensive prompt based on user inputs
-  const inputPrompt = buildPromptFromInputs(ideaDetails, questionnaire);
+  const basePrompt = buildPromptFromInputs(ideaDetails, questionnaire);
+
+  // Enhance with RAG for tool-specific optimization
+  const inputPrompt = await enhancePromptWithRAG(basePrompt, ideaDetails, questionnaire);
 
   const contents = [
     {

@@ -17,7 +17,7 @@ export function BlueprintCard() {
     dispatch(builderActions.setGenerating(true));
 
     try {
-      // Simulate blueprint generation based on app idea
+      // Step 1: Generate base blueprint
       setGenerationStep('Analyzing app requirements...');
       await new Promise(resolve => setTimeout(resolve, 1000));
 
@@ -30,8 +30,8 @@ export function BlueprintCard() {
       setGenerationStep('Creating data models...');
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Generate mock blueprint based on the app idea
-      const mockBlueprint: AppBlueprint = {
+      // Generate base blueprint
+      const baseBlueprint: AppBlueprint = {
         screens: generateMockScreens(),
         userRoles: generateMockUserRoles(),
         navigationFlow: generateNavigationFlow(),
@@ -40,9 +40,58 @@ export function BlueprintCard() {
         suggestedPattern: 'MVC (Model-View-Controller) pattern'
       };
 
-      dispatch(builderActions.setAppBlueprint(mockBlueprint));
+      // Step 2: Enhance with RAG if tool is selected
+      if (state.validationQuestions.preferredAITool) {
+        setGenerationStep('Enhancing with AI knowledge base...');
+
+        try {
+          const response = await fetch('/api/mvp-studio/enhance-stage', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              stage: 'blueprint',
+              data: {
+                appIdea: state.appIdea,
+                validationQuestions: state.validationQuestions,
+                appBlueprint: baseBlueprint
+              }
+            }),
+          });
+
+          if (response.ok) {
+            const enhancementResult = await response.json();
+            if (enhancementResult.success) {
+              // Use enhanced blueprint
+              const enhancedBlueprint = {
+                ...baseBlueprint,
+                ...enhancementResult.enhancement.enhancedBlueprint,
+                ragEnhanced: true,
+                confidenceScore: enhancementResult.enhancement.confidenceScore,
+                suggestions: enhancementResult.enhancement.suggestions
+              };
+
+              dispatch(builderActions.setAppBlueprint(enhancedBlueprint));
+            } else {
+              // Fall back to base blueprint
+              dispatch(builderActions.setAppBlueprint(baseBlueprint));
+            }
+          } else {
+            // Fall back to base blueprint
+            dispatch(builderActions.setAppBlueprint(baseBlueprint));
+          }
+        } catch (ragError) {
+          console.warn('RAG enhancement failed, using base blueprint:', ragError);
+          dispatch(builderActions.setAppBlueprint(baseBlueprint));
+        }
+      } else {
+        // No tool selected, use base blueprint
+        dispatch(builderActions.setAppBlueprint(baseBlueprint));
+      }
+
       dispatch(builderActions.saveProject());
-      
+
     } catch (error) {
       console.error('Error generating blueprint:', error);
       dispatch(builderActions.setError('Failed to generate blueprint'));

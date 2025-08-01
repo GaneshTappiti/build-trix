@@ -1,7 +1,8 @@
 // Full RAG Integration for MVP Studio
 // Based on the actual RAG repository: https://github.com/GaneshTappiti/RAG.git
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
+import { vectorService, VectorSearchResult, PromptTemplateResult } from './vector-service';
 
 // Types based on the actual RAG system
 export interface TaskContext {
@@ -160,6 +161,12 @@ You are a skilled AI development assistant on **{{ tool_profile.display_name }}*
 ### Constraints
 {{ task_context.constraints }}
 
+## Relevant Knowledge Base
+{{ relevant_knowledge }}
+
+## Similar Template Examples
+{{ similar_templates }}
+
 ## Guidelines Summary
 {{ guidelines }}
 
@@ -171,6 +178,7 @@ Provide a clear, formatted {{ tool_profile.display_name }} prompt that:
 - Follows accessibility best practices
 - Avoids vague language and ensures structure is clean
 - Includes proper error handling and loading states
+- Incorporates insights from the relevant knowledge base above
 
 **Remember:** Follow {{ tool_profile.display_name }}'s best practices for modern web development. Be specific, actionable, and comprehensive in your response.`,
 
@@ -228,23 +236,53 @@ Create a {{ task_context.task_type }} following {{ tool_profile.display_name }} 
     
     // Replace guidelines
     rendered = rendered.replace(/\{\{ guidelines \}\}/g, data.guidelines || 'Follow best practices for modern web development.');
-    
+
+    // Replace RAG context
+    rendered = rendered.replace(/\{\{ relevant_knowledge \}\}/g, this.formatKnowledgeBase(data.relevant_knowledge));
+    rendered = rendered.replace(/\{\{ similar_templates \}\}/g, this.formatSimilarTemplates(data.similar_templates));
+
     return rendered;
+  }
+
+  private formatKnowledgeBase(knowledge: VectorSearchResult[]): string {
+    if (!knowledge || knowledge.length === 0) {
+      return 'No specific knowledge base entries found for this task.';
+    }
+
+    return knowledge.map((item, index) =>
+      `### Knowledge ${index + 1}: ${item.title}
+${item.content}
+**Relevance:** ${(item.similarity_score * 100).toFixed(1)}%
+**Categories:** ${item.categories.join(', ')}
+`).join('\n');
+  }
+
+  private formatSimilarTemplates(templates: PromptTemplateResult[]): string {
+    if (!templates || templates.length === 0) {
+      return 'No similar templates found for this task type.';
+    }
+
+    return templates.map((template, index) =>
+      `### Template ${index + 1}: ${template.template_name}
+**Type:** ${template.template_type}
+**Similarity:** ${(template.similarity_score * 100).toFixed(1)}%
+**Content Preview:** ${template.template_content.substring(0, 200)}...
+`).join('\n');
   }
 }
 
 // Main RAG Prompt Generator class
 export class RAGPromptGenerator {
   private templateEngine: TemplateEngine;
-  private geminiAI: GoogleGenerativeAI | null = null;
+  private geminiAI: GoogleGenAI | null = null;
 
   constructor() {
     this.templateEngine = new TemplateEngine();
-    
+
     // Initialize Gemini AI if API key is available
     const apiKey = process.env.GEMINI_API_KEY;
     if (apiKey) {
-      this.geminiAI = new GoogleGenerativeAI(apiKey);
+      this.geminiAI = new GoogleGenAI({ apiKey });
     }
   }
 
@@ -254,29 +292,37 @@ export class RAGPromptGenerator {
     toolName: string = 'lovable'
   ): Promise<string> {
     const toolProfile = TOOL_PROFILES[toolName] || TOOL_PROFILES.lovable;
-    
+
+    // Retrieve relevant knowledge from vector database
+    const relevantKnowledge = await this.retrieveRelevantKnowledge(taskContext, toolName);
+
+    // Retrieve similar prompt templates
+    const similarTemplates = await this.retrieveSimilarTemplates(taskContext, toolName);
+
     // Get relevant guidelines for the tool
     const guidelines = this.getToolGuidelines(toolName);
-    
-    // Prepare template data
+
+    // Prepare template data with RAG context
     const templateData = {
       task_context: taskContext,
       project_info: projectInfo,
       tool_profile: toolProfile,
-      guidelines
+      guidelines,
+      relevant_knowledge: relevantKnowledge,
+      similar_templates: similarTemplates
     };
 
     // Choose template based on tool
     const templateName = toolName === 'lovable' ? 'lovable_task_template' : 'general_template';
-    
-    // Render the template
+
+    // Render the template with RAG context
     const prompt = this.templateEngine.render(templateName, templateData);
-    
+
     // Enhance with AI if Gemini is available
     if (this.geminiAI) {
       return await this.enhanceWithAI(prompt, toolProfile);
     }
-    
+
     return prompt;
   }
 
@@ -284,19 +330,26 @@ export class RAGPromptGenerator {
     if (!this.geminiAI) return basePrompt;
 
     try {
-      const model = this.geminiAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-      
       const enhancementPrompt = `Enhance this ${toolProfile.display_name} prompt to be more specific and actionable. Keep the same structure but add more technical details and best practices:
 
 ${basePrompt}
 
 Enhanced prompt:`;
 
-      const result = await model.generateContent(enhancementPrompt);
-      const response = await result.response;
-      const enhancedText = response.text();
-      
-      return enhancedText || basePrompt;
+      const response = await this.geminiAI.models.generateContent({
+        model: 'gemini-1.5-flash',
+        contents: [{
+          role: 'user',
+          parts: [{ text: enhancementPrompt }]
+        }]
+      });
+
+      let enhancedText = '';
+      for await (const chunk of response) {
+        enhancedText += chunk.text || '';
+      }
+
+      return enhancedText.trim() || basePrompt;
     } catch (error) {
       console.error('AI enhancement failed:', error);
       return basePrompt;
@@ -445,6 +498,101 @@ Enhanced prompt:`;
 
   getToolProfile(toolName: string): ToolProfile | null {
     return TOOL_PROFILES[toolName] || null;
+  }
+
+  /**
+   * Retrieve relevant knowledge from vector database
+   */
+  private async retrieveRelevantKnowledge(
+    taskContext: TaskContext,
+    toolName: string
+  ): Promise<VectorSearchResult[]> {
+    try {
+      const query = `${taskContext.task_type} ${taskContext.description} ${taskContext.technical_requirements.join(' ')}`;
+
+      const results = await vectorService.searchKnowledgeBase(query, {
+        targetTools: [toolName],
+        categories: this.extractCategories(taskContext),
+        maxResults: 5,
+        similarityThreshold: 0.6
+      });
+
+      return results;
+    } catch (error) {
+      console.error('Error retrieving relevant knowledge:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Retrieve similar prompt templates
+   */
+  private async retrieveSimilarTemplates(
+    taskContext: TaskContext,
+    toolName: string
+  ): Promise<PromptTemplateResult[]> {
+    try {
+      const query = `${taskContext.task_type} ${taskContext.description}`;
+
+      const results = await vectorService.searchPromptTemplates(query, {
+        targetTool: toolName,
+        templateType: this.determineTemplateType(taskContext),
+        maxResults: 3,
+        similarityThreshold: 0.7
+      });
+
+      return results;
+    } catch (error) {
+      console.error('Error retrieving similar templates:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Extract categories from task context
+   */
+  private extractCategories(taskContext: TaskContext): string[] {
+    const categories: string[] = [];
+
+    if (taskContext.task_type.includes('ui') || taskContext.task_type.includes('interface')) {
+      categories.push('ui_design');
+    }
+    if (taskContext.task_type.includes('backend') || taskContext.task_type.includes('api')) {
+      categories.push('backend');
+    }
+    if (taskContext.task_type.includes('database')) {
+      categories.push('database');
+    }
+    if (taskContext.task_type.includes('auth')) {
+      categories.push('authentication');
+    }
+
+    // Default category
+    if (categories.length === 0) {
+      categories.push('general');
+    }
+
+    return categories;
+  }
+
+  /**
+   * Determine template type from task context
+   */
+  private determineTemplateType(taskContext: TaskContext): string {
+    if (taskContext.task_type.includes('skeleton') || taskContext.task_type.includes('architecture')) {
+      return 'skeleton';
+    }
+    if (taskContext.task_type.includes('feature')) {
+      return 'feature';
+    }
+    if (taskContext.task_type.includes('debug') || taskContext.task_type.includes('fix')) {
+      return 'debugging';
+    }
+    if (taskContext.task_type.includes('optimize') || taskContext.task_type.includes('performance')) {
+      return 'optimization';
+    }
+
+    return 'feature'; // Default
   }
 }
 

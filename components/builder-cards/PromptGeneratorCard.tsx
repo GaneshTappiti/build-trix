@@ -22,8 +22,11 @@ export function PromptGeneratorCard() {
     dispatch(builderActions.clearScreenPrompts());
 
     try {
+      // Step 1: Generate base screen prompts
+      const baseScreenPrompts: ScreenPrompt[] = [];
+
       for (const screen of state.appBlueprint.screens) {
-        const prompt: ScreenPrompt = {
+        const basePrompt: ScreenPrompt = {
           screenId: screen.id,
           title: `${screen.name} Implementation`,
           layout: generateLayoutPrompt(screen),
@@ -33,8 +36,62 @@ export function PromptGeneratorCard() {
           styleHints: generateStyleHints(screen)
         };
 
-        dispatch(builderActions.addScreenPrompt(prompt));
-        await new Promise(resolve => setTimeout(resolve, 500)); // Simulate generation time
+        baseScreenPrompts.push(basePrompt);
+        dispatch(builderActions.addScreenPrompt(basePrompt));
+        await new Promise(resolve => setTimeout(resolve, 300)); // Simulate generation time
+      }
+
+      // Step 2: Enhance with RAG if tool is selected
+      if (state.validationQuestions.preferredAITool) {
+        try {
+          const response = await fetch('/api/mvp-studio/enhance-stage', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              stage: 'screen_prompts',
+              data: {
+                appIdea: state.appIdea,
+                validationQuestions: state.validationQuestions,
+                screenPrompts: {
+                  screens: state.appBlueprint.screens,
+                  prompts: baseScreenPrompts.reduce((acc, prompt) => {
+                    acc[prompt.screenId] = `${prompt.layout}\n${prompt.components}\n${prompt.behavior}`;
+                    return acc;
+                  }, {} as Record<string, string>)
+                }
+              }
+            }),
+          });
+
+          if (response.ok) {
+            const enhancementResult = await response.json();
+            if (enhancementResult.success) {
+              // Update prompts with RAG enhancements
+              const enhancedPrompts = enhancementResult.enhancement.enhancedPrompts;
+
+              // Clear and re-add enhanced prompts
+              dispatch(builderActions.clearScreenPrompts());
+
+              baseScreenPrompts.forEach((basePrompt) => {
+                const enhancedPrompt: ScreenPrompt = {
+                  ...basePrompt,
+                  layout: enhancedPrompts.optimizedPrompts[basePrompt.screenId] || basePrompt.layout,
+                  ragEnhanced: true,
+                  toolOptimizations: enhancedPrompts.toolSpecificOptimizations,
+                  designGuidelines: enhancedPrompts.designSystemGuidelines,
+                  confidenceScore: enhancementResult.enhancement.confidenceScore
+                };
+
+                dispatch(builderActions.addScreenPrompt(enhancedPrompt));
+              });
+            }
+          }
+        } catch (ragError) {
+          console.warn('RAG enhancement failed for screen prompts:', ragError);
+          // Base prompts are already added, so we continue
+        }
       }
 
       dispatch(builderActions.saveProject());

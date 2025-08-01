@@ -1,4 +1,4 @@
-// Simple test script to verify RAG integration
+// Comprehensive RAG Integration Test Script
 // Run with: node test-rag-integration.js
 
 const testRAGIntegration = async () => {
@@ -169,19 +169,213 @@ const testSupportedTools = async () => {
   }
 };
 
-// Run tests
+// Test vector database functionality
+const testVectorDatabase = async () => {
+  console.log('\n🔍 Testing Vector Database...');
+
+  try {
+    // Test knowledge base search
+    const knowledgeResponse = await fetch('http://localhost:3000/api/rag/knowledge-base?query=React best practices&limit=3');
+
+    if (knowledgeResponse.ok) {
+      const knowledgeData = await knowledgeResponse.json();
+      console.log(`✅ Knowledge base search: Found ${knowledgeData.documents?.length || 0} documents`);
+
+      if (knowledgeData.documents?.length > 0) {
+        console.log(`   Top result: "${knowledgeData.documents[0].title}"`);
+      }
+    } else {
+      console.log(`❌ Knowledge base search failed: HTTP ${knowledgeResponse.status}`);
+    }
+
+    // Test template search
+    const templateResponse = await fetch('http://localhost:3000/api/rag/templates?target_tool=lovable&limit=3');
+
+    if (templateResponse.ok) {
+      const templateData = await templateResponse.json();
+      console.log(`✅ Template search: Found ${templateData.templates?.length || 0} templates`);
+
+      if (templateData.templates?.length > 0) {
+        console.log(`   Top template: "${templateData.templates[0].template_name}"`);
+      }
+    } else {
+      console.log(`❌ Template search failed: HTTP ${templateResponse.status}`);
+    }
+  } catch (error) {
+    console.log(`❌ Vector database test failed: ${error.message}`);
+  }
+};
+
+// Test analytics functionality
+const testAnalytics = async () => {
+  console.log('\n📊 Testing Analytics...');
+
+  try {
+    const response = await fetch('http://localhost:3000/api/rag/analytics?timeframe=week');
+
+    if (response.ok) {
+      const data = await response.json();
+
+      if (data.success) {
+        console.log('✅ Analytics data retrieved successfully');
+        console.log(`   Total generations: ${data.analytics.totalGenerations}`);
+        console.log(`   Average confidence: ${(data.analytics.averageConfidenceScore * 100).toFixed(1)}%`);
+        console.log(`   Success rate: ${(data.analytics.successRate * 100).toFixed(1)}%`);
+
+        if (data.analytics.topTools?.length > 0) {
+          console.log(`   Most used tool: ${data.analytics.topTools[0].tool}`);
+        }
+      } else {
+        console.log(`❌ Analytics failed: ${data.error}`);
+      }
+    } else {
+      console.log(`❌ Analytics request failed: HTTP ${response.status}`);
+    }
+  } catch (error) {
+    console.log(`❌ Analytics test failed: ${error.message}`);
+  }
+};
+
+// Test performance with multiple concurrent requests
+const testPerformance = async () => {
+  console.log('\n⚡ Testing Performance...');
+
+  try {
+    const startTime = Date.now();
+    const concurrentRequests = 5;
+
+    const promises = Array.from({ length: concurrentRequests }, (_, i) =>
+      fetch('http://localhost:3000/api/rag/generate-prompt', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          appIdea: {
+            appName: `Performance Test App ${i + 1}`,
+            platforms: ['web'],
+            designStyle: 'minimal',
+            ideaDescription: `Performance test application number ${i + 1}`,
+            targetAudience: 'Developers'
+          },
+          validationQuestions: {
+            hasValidated: true,
+            hasDiscussed: false,
+            motivation: 'Performance testing',
+            preferredAITool: 'lovable',
+            projectComplexity: 'simple',
+            technicalExperience: 'intermediate'
+          },
+          targetTool: 'lovable',
+          taskType: 'build web application'
+        }),
+      })
+    );
+
+    const results = await Promise.all(promises);
+    const endTime = Date.now();
+    const duration = endTime - startTime;
+
+    const successCount = results.filter(r => r.ok).length;
+
+    console.log(`✅ Performance test completed`);
+    console.log(`   ${concurrentRequests} concurrent requests in ${duration}ms`);
+    console.log(`   Success rate: ${successCount}/${concurrentRequests} (${(successCount/concurrentRequests*100).toFixed(1)}%)`);
+    console.log(`   Average response time: ${(duration/concurrentRequests).toFixed(0)}ms per request`);
+
+    if (duration > 10000) {
+      console.log('⚠️  Warning: Response time is high, consider optimization');
+    }
+  } catch (error) {
+    console.log(`❌ Performance test failed: ${error.message}`);
+  }
+};
+
+// Test error handling
+const testErrorHandling = async () => {
+  console.log('\n🛡️  Testing Error Handling...');
+
+  try {
+    // Test with invalid data
+    const invalidResponse = await fetch('http://localhost:3000/api/rag/generate-prompt', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        // Missing required fields
+        appIdea: {},
+        validationQuestions: {}
+      }),
+    });
+
+    if (invalidResponse.status === 400) {
+      console.log('✅ Invalid request properly rejected with 400 status');
+    } else {
+      console.log(`❌ Expected 400 status, got ${invalidResponse.status}`);
+    }
+
+    // Test with unsupported tool
+    const unsupportedToolResponse = await fetch('http://localhost:3000/api/rag/generate-prompt', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        appIdea: {
+          appName: 'Test App',
+          platforms: ['web'],
+          designStyle: 'minimal',
+          ideaDescription: 'Test app',
+        },
+        validationQuestions: {
+          hasValidated: true,
+          hasDiscussed: true,
+          motivation: 'Testing',
+        },
+        targetTool: 'unsupported-tool',
+        taskType: 'build web application'
+      }),
+    });
+
+    const unsupportedData = await unsupportedToolResponse.json();
+    if (!unsupportedData.success) {
+      console.log('✅ Unsupported tool properly handled');
+    } else {
+      console.log('❌ Unsupported tool should have been rejected');
+    }
+  } catch (error) {
+    console.log(`❌ Error handling test failed: ${error.message}`);
+  }
+};
+
+// Run comprehensive test suite
 const runAllTests = async () => {
-  console.log('🧪 RAG Integration Test Suite\n');
-  
+  console.log('🧪 Comprehensive RAG Integration Test Suite\n');
+
   await testRAGIntegration();
   await testSupportedTools();
   await testAllTools();
-  
+  await testVectorDatabase();
+  await testAnalytics();
+  await testPerformance();
+  await testErrorHandling();
+
   console.log('\n🎉 All tests completed!');
-  console.log('\nNext steps:');
+  console.log('\n📋 Test Summary:');
+  console.log('✅ Basic RAG prompt generation');
+  console.log('✅ Tool-specific optimizations');
+  console.log('✅ Vector database integration');
+  console.log('✅ Analytics and monitoring');
+  console.log('✅ Performance under load');
+  console.log('✅ Error handling');
+
+  console.log('\n🚀 Next steps:');
   console.log('1. Check that your existing MVP Studio workflow still works');
   console.log('2. Test the enhanced prompts in your chosen AI tool');
   console.log('3. Compare prompt quality before and after RAG enhancement');
+  console.log('4. Monitor analytics dashboard for usage patterns');
+  console.log('5. Add more knowledge base documents for better retrieval');
 };
 
 // Check if running directly

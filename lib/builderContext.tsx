@@ -16,6 +16,10 @@ export interface ValidationQuestions {
   hasValidated: boolean;
   hasDiscussed: boolean;
   motivation: string;
+  // RAG-related fields for tool selection and enhancement
+  preferredAITool?: 'lovable' | 'cursor' | 'v0' | 'bolt' | 'claude' | 'chatgpt';
+  projectComplexity?: 'simple' | 'medium' | 'complex';
+  technicalExperience?: 'beginner' | 'intermediate' | 'advanced';
 }
 
 export interface Screen {
@@ -82,6 +86,13 @@ export interface AppBlueprint {
   pageFlow?: PageFlow[];
   architecture?: string;
   suggestedPattern?: string;
+  // RAG enhancement fields
+  ragEnhanced?: boolean;
+  confidenceScore?: number;
+  suggestions?: string[];
+  toolSpecificRecommendations?: string[];
+  securityConsiderations?: string[];
+  scalabilityNotes?: string[];
 }
 
 export interface ScreenPrompt {
@@ -92,6 +103,11 @@ export interface ScreenPrompt {
   behavior: string;
   conditionalLogic: string;
   styleHints: string;
+  // RAG enhancement fields
+  ragEnhanced?: boolean;
+  toolOptimizations?: string[];
+  designGuidelines?: string[];
+  confidenceScore?: number;
 }
 
 export interface AppFlow {
@@ -171,7 +187,10 @@ const initialState: BuilderState = {
   validationQuestions: {
     hasValidated: false,
     hasDiscussed: false,
-    motivation: ''
+    motivation: '',
+    preferredAITool: undefined,
+    projectComplexity: undefined,
+    technicalExperience: undefined
   },
   appBlueprint: null,
   screenPrompts: [],
@@ -266,11 +285,37 @@ function loadProject(state: BuilderState, projectId: string): BuilderState {
   const project = state.projectHistory.find(p => p.id === projectId);
   if (!project) return state;
 
-  return {
+  // Restore project state including RAG enhancement data
+  const restoredState = {
     ...project.state,
     projectHistory: state.projectHistory,
     currentProjectId: projectId
   };
+
+  // Ensure RAG enhancement data is preserved
+  if (restoredState.appBlueprint && project.state.appBlueprint) {
+    restoredState.appBlueprint = {
+      ...restoredState.appBlueprint,
+      ragEnhanced: project.state.appBlueprint.ragEnhanced,
+      confidenceScore: project.state.appBlueprint.confidenceScore,
+      suggestions: project.state.appBlueprint.suggestions,
+      toolSpecificRecommendations: project.state.appBlueprint.toolSpecificRecommendations,
+      securityConsiderations: project.state.appBlueprint.securityConsiderations,
+      scalabilityNotes: project.state.appBlueprint.scalabilityNotes
+    };
+  }
+
+  if (restoredState.screenPrompts && project.state.screenPrompts) {
+    restoredState.screenPrompts = project.state.screenPrompts.map(prompt => ({
+      ...prompt,
+      ragEnhanced: prompt.ragEnhanced,
+      toolOptimizations: prompt.toolOptimizations,
+      designGuidelines: prompt.designGuidelines,
+      confidenceScore: prompt.confidenceScore
+    }));
+  }
+
+  return restoredState;
 }
 
 function deleteProject(state: BuilderState, projectId: string): BuilderState {
@@ -416,12 +461,24 @@ export function BuilderProvider({ children }: { children: ReactNode }) {
     dispatch(builderActions.loadHistory());
   }, []);
 
-  // Auto-save project when significant changes occur
+  // Auto-save project when significant changes occur (including RAG enhancements)
   React.useEffect(() => {
     if (state.appIdea.appName && state.currentCard > 1 && !state.error) {
       const timeoutId = setTimeout(() => {
         try {
           dispatch(builderActions.saveProject());
+
+          // Also save RAG enhancement data to sessionStorage for immediate recovery
+          if (typeof window !== 'undefined') {
+            const ragData = {
+              blueprintEnhanced: state.appBlueprint?.ragEnhanced,
+              blueprintConfidence: state.appBlueprint?.confidenceScore,
+              blueprintSuggestions: state.appBlueprint?.suggestions,
+              screenPromptsEnhanced: state.screenPrompts.some(p => p.ragEnhanced),
+              selectedTool: state.validationQuestions.preferredAITool
+            };
+            sessionStorage.setItem('builder-rag-data', JSON.stringify(ragData));
+          }
         } catch (error) {
           console.error('Auto-save failed:', error);
           dispatch(builderActions.setError('Failed to auto-save project'));
@@ -430,7 +487,18 @@ export function BuilderProvider({ children }: { children: ReactNode }) {
 
       return () => clearTimeout(timeoutId);
     }
-  }, [state.appIdea, state.validationQuestions, state.appBlueprint, state.screenPrompts, state.appFlow, state.exportPrompts]);
+  }, [
+    state.appIdea,
+    state.validationQuestions,
+    state.appBlueprint,
+    state.screenPrompts,
+    state.appFlow,
+    state.exportPrompts,
+    // Include RAG-specific fields in dependency array
+    state.appBlueprint?.ragEnhanced,
+    state.appBlueprint?.confidenceScore,
+    state.screenPrompts.map(p => p.ragEnhanced).join(',')
+  ]);
 
   // Clear errors after 5 seconds
   React.useEffect(() => {
@@ -442,7 +510,7 @@ export function BuilderProvider({ children }: { children: ReactNode }) {
     }
   }, [state.error]);
 
-  // Persist current state to sessionStorage for recovery
+  // Persist current state to sessionStorage for recovery (including RAG data)
   React.useEffect(() => {
     if (state.currentCard > 1 && typeof window !== 'undefined') {
       try {
@@ -450,13 +518,35 @@ export function BuilderProvider({ children }: { children: ReactNode }) {
           currentCard: state.currentCard,
           appIdea: state.appIdea,
           validationQuestions: state.validationQuestions,
-          currentProjectId: state.currentProjectId
+          currentProjectId: state.currentProjectId,
+          // Include RAG enhancement data for complete recovery
+          appBlueprint: state.appBlueprint ? {
+            ...state.appBlueprint,
+            ragEnhanced: state.appBlueprint.ragEnhanced,
+            confidenceScore: state.appBlueprint.confidenceScore,
+            suggestions: state.appBlueprint.suggestions,
+            toolSpecificRecommendations: state.appBlueprint.toolSpecificRecommendations
+          } : null,
+          screenPrompts: state.screenPrompts.map(prompt => ({
+            ...prompt,
+            ragEnhanced: prompt.ragEnhanced,
+            toolOptimizations: prompt.toolOptimizations,
+            designGuidelines: prompt.designGuidelines,
+            confidenceScore: prompt.confidenceScore
+          }))
         }));
       } catch (error) {
         console.error('Failed to persist state:', error);
       }
     }
-  }, [state.currentCard, state.appIdea, state.validationQuestions, state.currentProjectId]);
+  }, [
+    state.currentCard,
+    state.appIdea,
+    state.validationQuestions,
+    state.currentProjectId,
+    state.appBlueprint,
+    state.screenPrompts
+  ]);
 
   return (
     <BuilderContext.Provider value={{ state, dispatch }}>
