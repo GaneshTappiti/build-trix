@@ -323,6 +323,185 @@ CREATE TRIGGER update_rag_templates_updated_at
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- =====================================================
+-- RAG-ENHANCED PROMPT STORAGE
+-- =====================================================
+
+-- Table to store generated prompts with RAG enhancements
+CREATE TABLE IF NOT EXISTS public.rag_generated_prompts (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    mvp_id UUID REFERENCES public.mvps(id) ON DELETE CASCADE,
+
+    -- Prompt Information
+    prompt_title TEXT NOT NULL,
+    prompt_content TEXT NOT NULL,
+    prompt_type TEXT NOT NULL CHECK (prompt_type IN ('blueprint', 'screen_prompt', 'unified', 'export')),
+
+    -- RAG Enhancement Data
+    is_rag_enhanced BOOLEAN DEFAULT FALSE,
+    confidence_score DECIMAL(3,2),
+    enhancement_suggestions JSONB DEFAULT '[]'::jsonb,
+    tool_optimizations JSONB DEFAULT '[]'::jsonb,
+    knowledge_sources JSONB DEFAULT '[]'::jsonb, -- IDs of knowledge base entries used
+
+    -- Context Information
+    target_tool TEXT NOT NULL,
+    stage_number INTEGER CHECK (stage_number BETWEEN 1 AND 6),
+    screen_id TEXT, -- For screen-specific prompts
+
+    -- Version Control
+    version INTEGER DEFAULT 1,
+    parent_prompt_id UUID REFERENCES public.rag_generated_prompts(id),
+    is_current_version BOOLEAN DEFAULT TRUE,
+
+    -- Usage Tracking
+    copy_count INTEGER DEFAULT 0,
+    last_copied_at TIMESTAMP WITH TIME ZONE,
+    export_count INTEGER DEFAULT 0,
+    last_exported_at TIMESTAMP WITH TIME ZONE,
+
+    -- Quality Metrics
+    user_rating INTEGER CHECK (user_rating BETWEEN 1 AND 5),
+    user_feedback TEXT,
+    effectiveness_score DECIMAL(3,2),
+
+    -- Metadata
+    tags JSONB DEFAULT '[]'::jsonb,
+    is_favorite BOOLEAN DEFAULT FALSE,
+    is_archived BOOLEAN DEFAULT FALSE,
+
+    -- Timestamps
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Table to store complete MVP Studio projects with RAG data
+CREATE TABLE IF NOT EXISTS public.mvp_studio_projects (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    mvp_id UUID REFERENCES public.mvps(id) ON DELETE CASCADE,
+
+    -- Project Information
+    project_name TEXT NOT NULL,
+    project_description TEXT,
+
+    -- Stage Data with RAG Enhancements
+    app_idea JSONB NOT NULL,
+    validation_questions JSONB NOT NULL,
+    app_blueprint JSONB,
+    screen_prompts JSONB,
+    app_flow JSONB,
+    export_prompts JSONB,
+
+    -- RAG Enhancement Summary
+    rag_enhancement_summary JSONB DEFAULT '{
+        "blueprint_enhanced": false,
+        "screen_prompts_enhanced": false,
+        "overall_confidence": 0,
+        "selected_tool": null,
+        "enhancement_count": 0
+    }'::jsonb,
+
+    -- Project Status
+    current_stage INTEGER DEFAULT 1 CHECK (current_stage BETWEEN 1 AND 6),
+    is_completed BOOLEAN DEFAULT FALSE,
+    completion_percentage DECIMAL(5,2) DEFAULT 0,
+
+    -- Collaboration
+    is_shared BOOLEAN DEFAULT FALSE,
+    share_token TEXT UNIQUE,
+    shared_at TIMESTAMP WITH TIME ZONE,
+
+    -- Metadata
+    tags JSONB DEFAULT '[]'::jsonb,
+    is_favorite BOOLEAN DEFAULT FALSE,
+    is_archived BOOLEAN DEFAULT FALSE,
+
+    -- Timestamps
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Table to store prompt collections/libraries
+CREATE TABLE IF NOT EXISTS public.prompt_collections (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+
+    -- Collection Information
+    collection_name TEXT NOT NULL,
+    description TEXT,
+    collection_type TEXT NOT NULL CHECK (collection_type IN ('personal', 'shared', 'template', 'favorites')),
+
+    -- Collection Data
+    prompt_ids UUID[] DEFAULT '{}',
+    total_prompts INTEGER DEFAULT 0,
+
+    -- Sharing
+    is_public BOOLEAN DEFAULT FALSE,
+    share_token TEXT UNIQUE,
+
+    -- Metadata
+    tags JSONB DEFAULT '[]'::jsonb,
+
+    -- Timestamps
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- =====================================================
+-- INDEXES FOR PROMPT STORAGE
+-- =====================================================
+
+-- Indexes for rag_generated_prompts
+CREATE INDEX IF NOT EXISTS idx_rag_prompts_user_id ON public.rag_generated_prompts(user_id);
+CREATE INDEX IF NOT EXISTS idx_rag_prompts_mvp_id ON public.rag_generated_prompts(mvp_id);
+CREATE INDEX IF NOT EXISTS idx_rag_prompts_type ON public.rag_generated_prompts(prompt_type);
+CREATE INDEX IF NOT EXISTS idx_rag_prompts_tool ON public.rag_generated_prompts(target_tool);
+CREATE INDEX IF NOT EXISTS idx_rag_prompts_stage ON public.rag_generated_prompts(stage_number);
+CREATE INDEX IF NOT EXISTS idx_rag_prompts_enhanced ON public.rag_generated_prompts(is_rag_enhanced);
+CREATE INDEX IF NOT EXISTS idx_rag_prompts_current ON public.rag_generated_prompts(is_current_version);
+CREATE INDEX IF NOT EXISTS idx_rag_prompts_created_at ON public.rag_generated_prompts(created_at);
+
+-- Indexes for mvp_studio_projects
+CREATE INDEX IF NOT EXISTS idx_mvp_studio_user_id ON public.mvp_studio_projects(user_id);
+CREATE INDEX IF NOT EXISTS idx_mvp_studio_stage ON public.mvp_studio_projects(current_stage);
+CREATE INDEX IF NOT EXISTS idx_mvp_studio_completed ON public.mvp_studio_projects(is_completed);
+CREATE INDEX IF NOT EXISTS idx_mvp_studio_shared ON public.mvp_studio_projects(is_shared);
+CREATE INDEX IF NOT EXISTS idx_mvp_studio_created_at ON public.mvp_studio_projects(created_at);
+
+-- Indexes for prompt_collections
+CREATE INDEX IF NOT EXISTS idx_prompt_collections_user_id ON public.prompt_collections(user_id);
+CREATE INDEX IF NOT EXISTS idx_prompt_collections_type ON public.prompt_collections(collection_type);
+CREATE INDEX IF NOT EXISTS idx_prompt_collections_public ON public.prompt_collections(is_public);
+
+-- =====================================================
+-- RLS POLICIES FOR PROMPT STORAGE
+-- =====================================================
+
+-- Enable RLS
+ALTER TABLE public.rag_generated_prompts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.mvp_studio_projects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.prompt_collections ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for rag_generated_prompts
+CREATE POLICY "Users can manage their own prompts" ON public.rag_generated_prompts
+    FOR ALL USING (auth.uid() = user_id);
+
+-- RLS Policies for mvp_studio_projects
+CREATE POLICY "Users can manage their own projects" ON public.mvp_studio_projects
+    FOR ALL USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can view shared projects" ON public.mvp_studio_projects
+    FOR SELECT USING (is_shared = true OR auth.uid() = user_id);
+
+-- RLS Policies for prompt_collections
+CREATE POLICY "Users can manage their own collections" ON public.prompt_collections
+    FOR ALL USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can view public collections" ON public.prompt_collections
+    FOR SELECT USING (is_public = true OR auth.uid() = user_id);
+
+-- =====================================================
 -- ANALYTICS FUNCTIONS
 -- =====================================================
 

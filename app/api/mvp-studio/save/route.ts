@@ -151,6 +151,124 @@ export async function POST(request: NextRequest) {
       user_id: user.id,
     };
 
+    // Store individual RAG-enhanced prompts for easy access
+    const promptsToStore = [];
+
+    // Store blueprint as a prompt if it exists and is RAG-enhanced
+    if (appBlueprint && appBlueprint.ragEnhanced) {
+      promptsToStore.push({
+        user_id: user.id,
+        mvp_id: mvpProject.id,
+        prompt_title: `${appIdea.appName} - App Blueprint`,
+        prompt_content: `# App Blueprint for ${appIdea.appName}
+
+## Architecture
+${appBlueprint.architecture}
+
+## Screens
+${appBlueprint.screens.map(screen => `- ${screen.name}: ${screen.purpose}`).join('\n')}
+
+## Data Models
+${appBlueprint.dataModels.map(model => `- ${model.name}: ${model.fields.join(', ')}`).join('\n')}
+
+${appBlueprint.toolSpecificRecommendations ? `
+## Tool-Specific Recommendations
+${appBlueprint.toolSpecificRecommendations.join('\n')}
+` : ''}
+
+${appBlueprint.securityConsiderations ? `
+## Security Considerations
+${appBlueprint.securityConsiderations.join('\n')}
+` : ''}`,
+        prompt_type: 'blueprint',
+        target_tool: validationQuestions.preferredAITool || 'general',
+        stage_number: 3,
+        is_rag_enhanced: true,
+        confidence_score: appBlueprint.confidenceScore,
+        enhancement_suggestions: appBlueprint.suggestions || [],
+        tool_optimizations: appBlueprint.toolSpecificRecommendations || [],
+        tags: ['mvp-studio', 'blueprint', appIdea.designStyle]
+      });
+    }
+
+    // Store screen prompts if they exist and are RAG-enhanced
+    if (screenPrompts && screenPrompts.length > 0) {
+      screenPrompts.forEach(prompt => {
+        if (prompt.ragEnhanced) {
+          promptsToStore.push({
+            user_id: user.id,
+            mvp_id: mvpProject.id,
+            prompt_title: `${appIdea.appName} - ${prompt.title}`,
+            prompt_content: `# ${prompt.title}
+
+## Layout
+${prompt.layout}
+
+## Components
+${prompt.components}
+
+## Behavior
+${prompt.behavior}
+
+## Conditional Logic
+${prompt.conditionalLogic}
+
+## Style Hints
+${prompt.styleHints}
+
+${prompt.toolOptimizations ? `
+## Tool Optimizations
+${prompt.toolOptimizations.join('\n')}
+` : ''}
+
+${prompt.designGuidelines ? `
+## Design Guidelines
+${prompt.designGuidelines.join('\n')}
+` : ''}`,
+            prompt_type: 'screen_prompt',
+            target_tool: validationQuestions.preferredAITool || 'general',
+            stage_number: 4,
+            screen_id: prompt.screenId,
+            is_rag_enhanced: true,
+            confidence_score: prompt.confidenceScore,
+            tool_optimizations: prompt.toolOptimizations || [],
+            tags: ['mvp-studio', 'screen-prompt', appIdea.designStyle]
+          });
+        }
+      });
+    }
+
+    // Store export prompts if they exist
+    if (exportPrompts) {
+      promptsToStore.push({
+        user_id: user.id,
+        mvp_id: mvpProject.id,
+        prompt_title: `${appIdea.appName} - Unified Export Prompt`,
+        prompt_content: exportPrompts.unifiedPrompt,
+        prompt_type: 'export',
+        target_tool: exportPrompts.targetTool || validationQuestions.preferredAITool || 'general',
+        stage_number: 6,
+        is_rag_enhanced: false, // Export prompts use RAG data but aren't directly enhanced
+        tags: ['mvp-studio', 'export', 'unified']
+      });
+    }
+
+    // Bulk insert prompts if any exist
+    if (promptsToStore.length > 0) {
+      try {
+        const { error: promptsError } = await supabase
+          .from('rag_generated_prompts')
+          .insert(promptsToStore);
+
+        if (promptsError) {
+          console.warn('Error storing individual prompts:', promptsError);
+          // Don't fail the main save operation for this
+        }
+      } catch (promptError) {
+        console.warn('Failed to store individual prompts:', promptError);
+      }
+    }
+
     const { error: questionnaireError } = await supabase.from('questionnaire').insert([questionnaireData]);
 
     if (questionnaireError) {
