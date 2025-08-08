@@ -1,4 +1,4 @@
-import { Code, LayoutDashboard, LucideIcon, List, MessageCircle, Rocket } from 'lucide-react';
+import { LayoutDashboard, LucideIcon, List, MessageCircle, Rocket, Brain } from 'lucide-react';
 
 export type Route = {
   title: string;
@@ -21,6 +21,11 @@ export const ROUTES: Route[] = [
     title: 'MVP Studio',
     url: '/mvp-studio',
     icon: Rocket,
+  },
+  {
+    title: 'Advanced Generator',
+    url: '/advanced-generator',
+    icon: Brain,
   },
   {
     title: 'Your MVPs',

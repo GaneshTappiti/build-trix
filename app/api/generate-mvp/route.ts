@@ -5,6 +5,8 @@ import { GenerateMVPRequest, GenerateMVPResponse, MVPIdeaFormData } from '@/type
 import { CreateMVPData } from '@/types/mvp';
 import { consumeMVPRateLimit, checkMVPRateLimit, clearMVPRateLimit } from '@/lib/ratelimit';
 import { enhancePromptWithRAG } from '@/lib/rag-enhancer';
+import { AppSkeletonGenerator } from '@/lib/app-skeleton-generator';
+import { GenerationSettings } from '@/types/app-skeleton';
 
 export async function POST(request: NextRequest) {
   try {
@@ -133,6 +135,57 @@ export async function POST(request: NextRequest) {
 
     // Step 3: Generate AI prompt using Gemini
     const generatedPrompt = await generateMVPPrompt(ideaDetails, questionnaire);
+
+    // Step 3.5: Generate App Skeleton for enhanced planning
+    let appSkeleton = null;
+    try {
+      const skeletonSettings: GenerationSettings = {
+        includeErrorStates: false,
+        includeLoadingStates: true,
+        includeEmptyStates: true,
+        includeBackendModels: false,
+        suggestUIComponents: true,
+        includeModalsPopups: false,
+        generateArchitecture: false,
+        appType: ideaDetails.platforms.includes('mobile') ? 'mobile' : 'web',
+        complexity: 'mvp'
+      };
+
+      const skeletonGenerator = new AppSkeletonGenerator(process.env.GEMINI_API_KEY!);
+      const skeletonResult = await skeletonGenerator.generateAppSkeleton({
+        userIdea: ideaDetails.app_description,
+        settings: skeletonSettings,
+        additionalContext: {
+          targetUsers: ideaDetails.target_users,
+          businessDomain: undefined,
+          specificRequirements: undefined
+        }
+      });
+
+      if (skeletonResult.success) {
+        appSkeleton = skeletonResult.appSkeleton;
+        
+        // Store the app skeleton
+        if (appSkeleton) {
+          const { error: skeletonError } = await supabase
+            .from('app_skeletons')
+            .insert([
+              {
+                ...appSkeleton,
+                user_id: user.id,
+                mvp_id: mvpProject.id, // Link to MVP project
+              },
+            ]);
+
+          if (skeletonError) {
+            console.error('Error storing app skeleton:', skeletonError);
+          }
+        }
+      }
+    } catch (skeletonError) {
+      console.error('Error generating app skeleton:', skeletonError);
+      // Continue with MVP generation even if skeleton fails
+    }
 
     // Step 4: Update MVP project with generated prompt
     const { error: updateError } = await supabase
